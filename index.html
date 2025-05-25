@@ -8,14 +8,15 @@
   <h2>AutoDex Arbitrage Interface</h2>
 
   <button onclick="connectWallet()">Connect Wallet</button>
-  <button onclick="start()">Start Scanning</button>
-  <button onclick="stop()">Stop Scanning</button>
+  <button onclick="start()" disabled id="startBtn">Start Scanning</button>
+  <button onclick="stop()" disabled id="stopBtn">Stop Scanning</button>
 
   <pre id="log"></pre>
 
   <script>
     let provider, signer, contract;
     let scanInterval;
+    let userAddress = null;
 
     const contractAddress = "0x6eEac716eDA14c0Adc5Cfc1947319552D423dad6";
 
@@ -27,25 +28,69 @@
       "function owner() view returns (address)"
     ];
 
+    function log(msg) {
+      const el = document.getElementById("log");
+      el.textContent = `[${new Date().toLocaleTimeString()}] ` + msg + "\n" + el.textContent;
+    }
+
     async function connectWallet() {
-      provider = new ethers.providers.Web3Provider(window.ethereum);
-      await provider.send("eth_requestAccounts", []);
-      signer = provider.getSigner();
-      contract = new ethers.Contract(contractAddress, abi, signer);
-      log("Wallet connected: " + await signer.getAddress());
+      if (!window.ethereum) {
+        log("MetaMask is not installed. Please install it to use this app.");
+        return;
+      }
+      try {
+        provider = new ethers.providers.Web3Provider(window.ethereum);
+        await provider.send("eth_requestAccounts", []);
+        signer = provider.getSigner();
+        userAddress = await signer.getAddress();
+        log("Wallet connected: " + userAddress);
+
+        // Initialize contract
+        contract = new ethers.Contract(contractAddress, abi, signer);
+
+        // Enable start button now that we're connected
+        document.getElementById("startBtn").disabled = false;
+        document.getElementById("stopBtn").disabled = false;
+      } catch (err) {
+        log("Error connecting wallet: " + (err.message || err));
+      }
     }
 
     async function start() {
-      await contract.startScanning();
-      log("Scanning started.");
-      if (scanInterval) clearInterval(scanInterval);
-      scanInterval = setInterval(scanLoop, 5000);
+      if (!contract) {
+        log("Please connect your wallet first.");
+        return;
+      }
+
+      try {
+        await contract.startScanning();
+        log("Scanning started.");
+        if (scanInterval) clearInterval(scanInterval);
+        scanInterval = setInterval(scanLoop, 5000);
+        // Disable start button to prevent multiple calls
+        document.getElementById("startBtn").disabled = true;
+        document.getElementById("stopBtn").disabled = false;
+      } catch (err) {
+        log("Error starting scan: " + (err.reason || err.message));
+      }
     }
 
     async function stop() {
-      await contract.stopScanning();
-      clearInterval(scanInterval);
-      log("Scanning stopped.");
+      if (!contract) {
+        log("Please connect your wallet first.");
+        return;
+      }
+
+      try {
+        await contract.stopScanning();
+        clearInterval(scanInterval);
+        log("Scanning stopped.");
+        // Enable start button again
+        document.getElementById("startBtn").disabled = false;
+        document.getElementById("stopBtn").disabled = true;
+      } catch (err) {
+        log("Error stopping scan: " + (err.reason || err.message));
+      }
     }
 
     async function scanLoop() {
@@ -57,11 +102,6 @@
       } catch (err) {
         log("Error: " + (err.reason || err.message));
       }
-    }
-
-    function log(msg) {
-      const el = document.getElementById("log");
-      el.textContent = `[${new Date().toLocaleTimeString()}] ` + msg + "\n" + el.textContent;
     }
   </script>
 </body>
