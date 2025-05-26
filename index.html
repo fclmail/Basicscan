@@ -23,17 +23,26 @@
     async function connectWallet() {
       if (window.ethereum) {
         try {
+          // First try with ethers.js
           provider = new ethers.providers.Web3Provider(window.ethereum);
           await provider.send("eth_requestAccounts", []);
           signer = provider.getSigner();
           userAddress = await signer.getAddress();
-          document.getElementById("status").innerText = "Connected: " + userAddress;
+          document.getElementById("status").innerText = "Connected (ethers.js): " + userAddress;
         } catch (err) {
-          console.error(err);
-          alert("Connection failed");
+          console.warn("ethers.js connection failed, trying Vanilla", err);
+          try {
+            // Fallback: Vanilla JS connection
+            const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+            userAddress = accounts[0];
+            document.getElementById("status").innerText = "Connected (Vanilla): " + userAddress;
+          } catch (vanillaErr) {
+            console.error("Vanilla connection also failed", vanillaErr);
+            alert("MetaMask connection failed.");
+          }
         }
       } else {
-        alert("MetaMask not found! Install MetaMask first.");
+        alert("MetaMask not found! Install MetaMask.");
       }
     }
   </script>
